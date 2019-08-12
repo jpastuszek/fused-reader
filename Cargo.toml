@@ -1,0 +1,10 @@
+[package]
+name = "fused-reader"
+version = "0.1.0"
+authors = ["Jakub Pastuszek <jpastuszek@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+
+[dev-dependencies]
+ringtail = "0.3.0"
