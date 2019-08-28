@@ -1,6 +1,6 @@
 [package]
 name = "fused-reader"
-version = "0.1.0"
+version = "0.1.1-alpha.0"
 authors = ["Jakub Pastuszek <jpastuszek@protonmail.com>"]
 description = "This crate provides fused reader type that if writer thread dies while holding armed fuse the reader will get BrokenPipe error"
 repository = "https://github.com/jpastuszek/fused-reader"
