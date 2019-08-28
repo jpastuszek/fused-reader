@@ -1,3 +1,57 @@
+/*!
+When working with data pipes it is often necessary to distinguish between EOF on the reader side caused by writer thread finishing write and writer panicking. This crate provides fused reader type that if writer thread dies while holding armed fuse the reader will get `BrokenPipe` error.
+
+Fuses can also be blown with custom error that is passed to the reader end.
+
+Example usage
+=============
+
+Writer panics and reader gets `BrokenPipe` error.
+
+```rust
+use pipe::pipe;
+use fused_reader::fuse;
+use std::io::{Read, Write, ErrorKind};
+use std::thread;
+
+let (reader, mut writer) = pipe();
+let (mut reader, fuse) = fuse(reader);
+
+thread::spawn(move || {
+    let _fuse = fuse.arm().unwrap();
+    writer.write(&[1]).unwrap();
+    panic!("boom");
+});
+
+let mut data = Vec::new();
+
+assert_eq!(reader.read_to_end(&mut data).unwrap_err().kind(), ErrorKind::BrokenPipe);
+assert_eq!(&data, &[1]); // data that was written before panic
+```
+
+Writer fails with error passed to reader.
+
+```rust
+use pipe::pipe;
+use fused_reader::fuse;
+use std::io::{Read, Write, Error as IoError, ErrorKind};
+use std::thread;
+
+let (reader, mut writer) = pipe();
+let (mut reader, fuse) = fuse(reader);
+
+thread::spawn(move || {
+    let fuse = fuse.arm().unwrap();
+    writer.write(&[1]).unwrap();
+    fuse.blow(IoError::new(ErrorKind::UnexpectedEof, "uh! oh!"))
+});
+
+let mut data = Vec::new();
+
+assert_eq!(reader.read_to_end(&mut data).unwrap_err().kind(), ErrorKind::UnexpectedEof);
+assert_eq!(&data, &[1]); // data that was written before error
+```
+!*/
 use std::io::{Read, Error as IoError, ErrorKind};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 
@@ -27,9 +81,9 @@ pub enum FuseStatus {
     Unarmed,
     /// Fuse armed.
     Armed,
-    /// Fuse blown with error.
+    /// Fuse blown with custom error.
     Blown(IoError),
-    /// Fuse blown due by unwind.
+    /// Fuse blown by panic unwind.
     Poisoned,
 }
 
@@ -107,7 +161,7 @@ mod tests {
     use super::*;
     use std::thread;
     use std::io::Write;
-    use ringtail::io::pipe;
+    use pipe::pipe;
 
     #[test]
     fn test_unfused_panic() {
@@ -126,7 +180,6 @@ mod tests {
 
     #[test]
     fn test_fused_nopanic() {
-
         let (reader, mut writer) = pipe();
 
         let (mut reader, fuse) = fuse(reader);
@@ -144,7 +197,6 @@ mod tests {
 
     #[test]
     fn test_fused_panic() {
-
         let (reader, mut writer) = pipe();
 
         let (mut reader, fuse) = fuse(reader);
@@ -157,13 +209,12 @@ mod tests {
 
         let mut data = Vec::new();
 
-        assert!(reader.read_to_end(&mut data).is_err());
+        assert_eq!(reader.read_to_end(&mut data).unwrap_err().kind(), ErrorKind::BrokenPipe);
         assert_eq!(&data, &[1]);
     }
 
     #[test]
     fn test_fused_blow() {
-
         let (reader, mut writer) = pipe();
 
         let (mut reader, fuse) = fuse(reader);
@@ -171,12 +222,12 @@ mod tests {
         thread::spawn(move || {
             let fuse = fuse.arm().unwrap();
             writer.write(&[1]).unwrap();
-            fuse.blow(IoError::new(ErrorKind::BrokenPipe, "boom!"))
+            fuse.blow(IoError::new(ErrorKind::UnexpectedEof, "uh! oh!"))
         });
 
         let mut data = Vec::new();
 
-        assert!(reader.read_to_end(&mut data).is_err());
+        assert_eq!(reader.read_to_end(&mut data).unwrap_err().kind(), ErrorKind::UnexpectedEof);
         assert_eq!(&data, &[1]);
     }
 }

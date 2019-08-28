@@ -2,9 +2,16 @@
 name = "fused-reader"
 version = "0.1.0"
 authors = ["Jakub Pastuszek <jpastuszek@protonmail.com>"]
+description = "This crate provides fused reader type that if writer thread dies while holding armed fuse the reader will get BrokenPipe error"
+repository = "https://github.com/jpastuszek/fused-reader"
+documentation = "https://docs.rs/fused-reader"
+readme = "README.md"
+keywords = ["io", "pipe", "error"]
+categories = ["concurrency"]
+license = "MIT"
 edition = "2018"
 
 [dependencies]
 
 [dev-dependencies]
-ringtail = "0.3.0"
+pipe = "0.2.0"
